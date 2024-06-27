@@ -7,10 +7,14 @@ const mongoose = require("mongoose");
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/users');
 const catalogRouter = require('./routes/catalog');
+const compression = require("compression");
+const helmet = require("helmet");
 mongoose.set("strictQuery", false);
 
 // Define the database URL to connect to.
-const mongoDB = "mongodb://localhost:27017/";
+// const mongoDB = "mongodb://localhost:27017/";
+const dev_db_url = "mongodb://localhost:27017/";
+const mongoDB = process.env.MONGODB_URI || dev_db_url;
 
 // Wait for database to connect, logging an error if there is a problem
 main().catch((err) => console.log(err));
@@ -23,11 +27,30 @@ const app = express();
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
 
+// Set up rate limiter: maximum of twenty requests per minute
+const RateLimit = require("express-rate-limit");
+const limiter = RateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 20,
+});
+// Apply rate limiter to all requests
+app.use(limiter);
+
+// Add helmet to the middleware chain.
+// Set CSP headers to allow our Bootstrap and Jquery to be served
+app.use(
+  helmet.contentSecurityPolicy({
+    directives: {
+      "script-src": ["'self'", "code.jquery.com", "cdn.jsdelivr.net"],
+    },
+  }),
+);
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')))
+app.use(compression()); // Compress all routes
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
